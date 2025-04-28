@@ -3,12 +3,20 @@
 class Ship : public vsite::nwp::window
 {
 	bool moving = false;
+	static const int size = 20;
+	bool is_created = false;
 
 public:
+	std::string class_name() override
+	{
+		return "STATIC";
+	}
+
 	bool create(HWND parent, POINT position)
 	{
-		return vsite::nwp::window::create(parent, WS_CHILD | WS_VISIBLE | SS_CENTER, "x", 0,
-			position.x, position.y, 20, 20);
+		is_created = vsite::nwp::window::create(parent, WS_CHILD | WS_VISIBLE | SS_CENTER, "x", 0,
+			position.x, position.y, size, size);
+		return is_created;
 	}
 
 	void set_moving(bool m)
@@ -16,27 +24,30 @@ public:
 		if (moving != m)
 		{
 			moving = m;
-			HWND hwnd = *this;
-			LONG style = ::GetWindowLong(hwnd, GWL_STYLE);
+			LONG style = ::GetWindowLong(*this, GWL_STYLE);
 			if (moving)
 				style |= WS_BORDER;
 			else
 				style &= ~WS_BORDER;
-			::SetWindowLong(hwnd, GWL_STYLE, style);
-			::SetWindowPos(hwnd, 0, 0, 0, 0, 0,
+			::SetWindowLong(*this, GWL_STYLE, style);
+			::SetWindowPos(*this, 0, 0, 0, 0, 0,
 				SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 		}
 	}
 
+	void set_position(POINT p)
+	{
+		::SetWindowPos(*this, 0, p.x, p.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+	}
+
 	void move(int direction, bool ctrl_pressed)
 	{
-		HWND hwnd = *this;
 		RECT client;
-		::GetWindowRect(hwnd, &client);
+		::GetWindowRect(*this, &client);
 		POINT p = { client.left, client.top };
-		::ScreenToClient(::GetParent(hwnd), &p);
+		::ScreenToClient(::GetParent(*this), &p);
 
-		int actual_step = ctrl_pressed ? 5 * 3 : 5;
+		int actual_step = ctrl_pressed ? 15 : 5;
 
 		switch (direction)
 		{
@@ -55,13 +66,15 @@ public:
 		}
 
 		RECT parent;
-		::GetClientRect(::GetParent(hwnd), &parent);
+		::GetClientRect(::GetParent(*this), &parent);
 
-		p.x = std::max<int>(0, std::min<int>(p.x, parent.right - 20));
-		p.y = std::max<int>(0, std::min<int>(p.y, parent.bottom - 20));
+		p.x = max(0, min(p.x, parent.right - size));
+		p.y = max(0, min(p.y, parent.bottom - size));
 
-		::SetWindowPos(hwnd, 0, p.x, p.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+		set_position(p);
 	}
+
+	bool exists() const { return is_created; }
 };
 
 class main_window : public vsite::nwp::window
@@ -69,27 +82,24 @@ class main_window : public vsite::nwp::window
 protected:
 	void on_left_button_down(POINT p) override
 	{
-		if (!ship_initialized) 
+		if (!ship)
 		{
-			ship_initialized = true;
 			ship.create(*this, p);
 		}
 		else
 		{
-			HWND hwnd = ship; 
-			::SetWindowPos(hwnd, 0, p.x, p.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+			ship.set_position(p);
 		}
 	}
 
 	void on_key_up(int vk) override
 	{
-		if (ship_initialized) 
-			ship.set_moving(false);
+		ship.set_moving(false);
 	}
 
 	void on_key_down(int vk) override
 	{
-		if (ship_initialized && (vk == VK_LEFT || vk == VK_RIGHT || vk == VK_UP || vk == VK_DOWN))
+		if (vk == VK_LEFT || vk == VK_RIGHT || vk == VK_UP || vk == VK_DOWN)
 		{
 			ship.set_moving(true);
 			bool ctrl_pressed = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
@@ -104,7 +114,6 @@ protected:
 
 private:
 	Ship ship;
-	bool ship_initialized = false;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hp, LPSTR cmdLine, int nShow)
