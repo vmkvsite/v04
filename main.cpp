@@ -1,10 +1,11 @@
+#define NOMINMAX
 #include "nwpwin.h"
+#include <algorithm>
 
 class Ship : public vsite::nwp::window
 {
 	bool moving = false;
 	static const int size = 20;
-	bool is_created = false;
 
 public:
 	std::string class_name() override
@@ -14,9 +15,8 @@ public:
 
 	bool create(HWND parent, POINT position)
 	{
-		is_created = vsite::nwp::window::create(parent, WS_CHILD | WS_VISIBLE | SS_CENTER, "x", 0,
+		return vsite::nwp::window::create(parent, WS_CHILD | WS_VISIBLE | SS_CENTER, "x", 0,
 			position.x, position.y, size, size);
-		return is_created;
 	}
 
 	void set_moving(bool m)
@@ -68,13 +68,11 @@ public:
 		RECT parent;
 		::GetClientRect(::GetParent(*this), &parent);
 
-		p.x = max(0, min(p.x, parent.right - size));
-		p.y = max(0, min(p.y, parent.bottom - size));
+		p.x = std::max(0L, std::min(p.x, parent.right - size));
+		p.y = std::max(0L, std::min(p.y, parent.bottom - size));
 
 		set_position(p);
 	}
-
-	bool exists() const { return is_created; }
 };
 
 class main_window : public vsite::nwp::window
